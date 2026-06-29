@@ -20,7 +20,7 @@
 
 ---
 
-## Abstract
+## 1. Title Page and Abstract
 
 The convergence of Information Technology (IT), Operational Technology (OT), and Internet of Things (IoT) networks in industrial environments has created attack surfaces that traditional perimeter-based segmentation cannot adequately protect. This project addresses the challenge of generating micro-segmentation policies for heterogeneous IoT/OT environments where device behaviour is too diverse and dynamic for manual policy authoring. A simulated industrial testbed comprising nine Docker-containerised devices across three network zones — OT (Modbus TCP), IoT (MQTT), and DMZ (HTTP) — was constructed to replicate a representative industrial control system topology. A two-tier unsupervised anomaly detection pipeline, combining Isolation Forest for fast pre-filtering with DBSCAN for density-based deep analysis, was trained on behavioural feature vectors extracted from network traffic. Preliminary results from test captures demonstrate complete separation between the attacker device (ensemble score 1.0) and all benign devices (highest benign score 0.079), with an identification confidence of 99.9%. A confidence-gated isolation engine enforces automated network segmentation by disconnecting compromised containers from Docker bridge networks when ensemble scores exceed 0.90. At the time of this interim submission, the testbed, data collection pipeline, machine learning models, isolation logic, and SOC-style dashboard are substantially complete. Remaining work focuses on full end-to-end integration, Wazuh active-response testing, and formal evaluation across repeated attack scenarios.
 
@@ -227,6 +227,10 @@ Additionally, three Wazuh components are deployed: `wazuh-indexer` (OpenSearch-b
 
 The attacker device (Engineering-WS, 192.168.10.50) is deliberately connected to both `ot-network` and `dmz-network`, simulating a dual-homed workstation with legitimate cross-zone access — a realistic attack vector in industrial environments where engineering workstations require access to multiple network segments for maintenance purposes.
 
+[SCREENSHOT PLACEHOLDER #2: docker ps showing all containers running]
+
+[SCREENSHOT PLACEHOLDER #3: docker network list showing active networks]
+
 ### 6.2 Traffic Generation and Capture Pipeline
 
 The traffic capture pipeline is implemented in `ml_pipeline/capture_traffic.py`. It uses Scapy's `sniff()` function in a background thread, running for exactly 300 seconds. A packet handler callback extracts metadata from each captured packet (source/destination IP, packet size, protocol classification, SYN flag detection, Modbus write function code detection, and zone boundary crossing). Packets are buffered per source IP per 10-second window. At the end of each window, the `compute_features()` function calculates 10 behavioural features for every registered device and appends the results to an in-memory list. After 30 windows, the complete dataset (270 rows) is written to `dataset/clustering_dataset.csv`.
@@ -235,9 +239,17 @@ Protocol detection classifies packets by destination port: port 502 maps to Modb
 
 A synthetic dataset generator (`ml_pipeline/generate_synthetic_dataset.py`) was also implemented for testing when Docker containers are not running. It produces the identical 270-row schema with the attacker device (Engineering-WS) exhibiting escalating scan_rate (0.6→0.67), write_ratio (0.0→0.59), and cross_zone_ratio (0.3→0.89) across three simulated attack phases: reconnaissance (windows 1–9), active exploitation (windows 10–20), and lateral movement (windows 21–30).
 
+[SCREENSHOT PLACEHOLDER #4: Real-time traffic capture console output]
+
+[SCREENSHOT PLACEHOLDER #5: SQLite database configuration showing clustering_dataset.csv]
+
 ### 6.3 Machine Learning Pipeline
 
 The training pipeline is implemented in `ml_pipeline/train_models.py`. It loads the 270-row windowed dataset, aggregates the 30 windows per device into a single profile row using the MAX/MEAN strategy described in Section 3.4, producing 9 device profiles. Features are scaled using `sklearn.preprocessing.RobustScaler`. The Isolation Forest is trained with 200 estimators and contamination 0.11. DBSCAN's `eps` parameter is auto-computed using a k-distance graph: 2-nearest-neighbour distances are calculated via `sklearn.neighbors.NearestNeighbors`, and `eps` is set to the 75th percentile of these distances. The two-tier ensemble scoring function applies weights of 0.40 (IF) and 0.60 (DBSCAN) for Tier 1-flagged devices, and a dampened IF-only score for Tier 1-passed devices. All trained model objects, the scaler, and feature column metadata are serialised to `results/ml_models.pkl` using Python's `pickle` module. Per-device scored results are saved to `results/device_scores.json`.
+
+[SCREENSHOT PLACEHOLDER #6: ML model training console logs]
+
+[SCREENSHOT PLACEHOLDER #13: Device scores graph showing classification separation]
 
 ### 6.4 Detection and Enforcement Layer
 
@@ -249,9 +261,17 @@ The SmartIsolator (`enforcement/smart_isolator.py`) receives ensemble scores fro
 
 The ML-Based Segmentation Engine (`enforcement/ml_based_segmentation.py`) handles the physical network disconnection. It resolves device IPs to Docker container names via a static mapping derived from `docker-compose.yml`, enumerates all connected networks for the target container, disconnects the container from each network using the Docker SDK, verifies isolation by re-inspecting network membership, creates a CRITICAL incident record in the database, and dispatches alerts via UDP to the WebSocket layer. It also identifies compromised devices by querying the events table for `MALICIOUS_WRITE` actions originating from the attacker IP within the preceding 5 minutes, and isolates those devices as `COMPROMISED`.
 
+[SCREENSHOT PLACEHOLDER #7: SmartIsolator unit test results verifying target isolation and scan exception logic]
+
 ### 6.5 Dashboard and Visualisation Layer
 
 The frontend is implemented as a React single-page application built with Vite and styled with Tailwind CSS, located in `frontend-react/`. It comprises seven pages: **Dashboard** (real-time event feed, threat level gauge, network topology visualisation, and summary statistics), **Isolated Devices** (list of all devices isolated by the segmentation engine with timestamps, reasons, and network details), **Rules Triggered** (detection rules that fired, grouped by action type with trigger counts), **Anomalies Detected** (detailed anomaly list with ensemble scores, severity classification, and detection method), **Incidents** (CRITICAL incident records with related anomaly and event counts), **Threat Hunting** (investigation interface for querying events by IP, time range, and action type), and **Settings** (system configuration, ML monitor control, and database reset).
+
+[SCREENSHOT PLACEHOLDER #8: React Dashboard Overview showing the live threat stats]
+
+[SCREENSHOT PLACEHOLDER #9: Isolated Devices page tracking active container isolations]
+
+[SCREENSHOT PLACEHOLDER #10: Anomalies Detected Log recording pipeline alerts]
 
 The backend API is a Flask application (`api/app.py`) with four route blueprints: `dashboard` (summary statistics, timeline, topology, isolations, rules, anomalies, and cluster data), `data` (raw event retrieval and filtering), `investigation` (threat hunting queries and investigation management), and `system` (ML monitor start/stop, system reset, and status reporting). Cross-origin requests are enabled via Flask-CORS, and real-time updates are delivered through Flask-SocketIO.
 
