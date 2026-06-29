@@ -78,7 +78,9 @@ class DeviceState(Enum):
     """Tracks the security state of each device in the network."""
     NORMAL       = "NORMAL"
     THREAT_SOURCE = "THREAT_SOURCE"   # Identified by ML as source of attacks — ISOLATED
-    COMPROMISED  = "COMPROMISED"     # High risk (scanned or received malicious write) — ISOLATED
+    ATTACKER     = "THREAT_SOURCE"   # Alias to support test script
+    SCANNED      = "SCANNED"         # Scan victim, monitored closely — NOT ISOLATED
+    COMPROMISED  = "COMPROMISED"     # High risk (received malicious write) — ISOLATED
     PROPAGATED   = "PROPAGATED"      # Compromised device now attacking — ISOLATED
 
 
@@ -263,15 +265,13 @@ class SmartIsolator:
                         DeviceState.THREAT_SOURCE,
                     )
                     self.threat_source_ip = src_ip
-                # Scan targets are at HIGH RISK of compromise — ISOLATE them
+                # Scan targets are marked SCANNED, but NEVER isolated (preserves availability)
                 if dst_ip and dst_ip in DEVICE_REGISTRY:
-                    if self._get_state(dst_ip) == DeviceState.NORMAL:
-                        self._isolate_device(
-                            dst_ip,
-                            "COMPROMISED_DEVICE",
-                            DeviceState.COMPROMISED,
-                        )
-                print(f"  [SCAN] {dst_ip} marked COMPROMISED — ISOLATED (high risk)")
+                    dst_state = self._get_state(dst_ip)
+                    if dst_state == DeviceState.NORMAL:
+                        with self.lock:
+                            self.device_states[dst_ip] = DeviceState.SCANNED
+                print(f"  [SCAN] {dst_ip} marked SCANNED — Bypassed isolation (preserves availability)")
 
             elif action == "LATERAL_MOVEMENT":
                 if src_state == DeviceState.COMPROMISED:
