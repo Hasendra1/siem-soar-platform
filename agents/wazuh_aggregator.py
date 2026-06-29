@@ -1,0 +1,1 @@
+# Wazuh alert aggregation agent

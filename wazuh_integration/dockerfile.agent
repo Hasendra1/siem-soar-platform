@@ -1,0 +1,56 @@
+# ==============================================================================
+# SIEM+SOAR Platform - Wazuh Agent Dockerfile
+# ==============================================================================
+# Extends Python containers with Wazuh HIDS agent for real-time log collection,
+# file integrity monitoring, and security event forwarding to the SIEM pipeline.
+#
+# Usage:
+#   docker build -f dockerfile.agent -t siem-agent:latest .
+# ==============================================================================
+
+FROM python:3.9-slim
+
+LABEL maintainer="SIEM+SOAR Platform"
+LABEL description="Python container with Wazuh agent for IoT/OT security monitoring"
+
+# --- System dependencies -----------------------------------------------------
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        curl \
+        gnupg2 \
+        wget \
+        procps \
+        iproute2 \
+        net-tools \
+    && rm -rf /var/lib/apt/lists/*
+
+# --- Wazuh agent installation ------------------------------------------------
+RUN curl -s https://packages.wazuh.com/key/GPG-KEY-WAZUH | gpg --no-default-keyring --keyring gnupg-ring:/usr/share/keyrings/wazuh.gpg --import \
+    && chmod 644 /usr/share/keyrings/wazuh.gpg \
+    && echo "deb [signed-by=/usr/share/keyrings/wazuh.gpg] https://packages.wazuh.com/4.x/apt/ stable main" \
+       > /etc/apt/sources.list.d/wazuh.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends wazuh-agent=4.7.5-1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# --- Log directories ----------------------------------------------------------
+RUN mkdir -p /var/log \
+    && touch /var/log/modbus.log \
+    && touch /var/log/mqtt.log \
+    && touch /var/log/syslog
+
+# --- Copy Wazuh configuration ------------------------------------------------
+COPY ossec.conf /var/ossec/etc/ossec.conf
+
+# --- Python dependencies for IoT/OT simulation -------------------------------
+RUN pip install --no-cache-dir \
+        pymodbus==3.6.6 \
+        paho-mqtt==1.6.1 \
+        flask
+
+# --- Health check -------------------------------------------------------------
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+    CMD pgrep -x ossec-agentd > /dev/null || exit 1
+
+# --- Entrypoint ---------------------------------------------------------------
+# Start Wazuh agent, then tail its log to keep the container running
+CMD ["bash", "-c", "/var/ossec/bin/wazuh-control start && exec tail -f /var/ossec/logs/ossec.log"]

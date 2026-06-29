@@ -1,0 +1,110 @@
+[
+  {
+    "device_ip": "192.168.10.50",
+    "device_name": "Engineering-WS",
+    "device_type": "WORKSTATION",
+    "zone": "OT",
+    "ensemble_score": 1.0,
+    "iso_score": 1.0,
+    "db_score": 1.0,
+    "tier1_decision": "FLAGGED",
+    "confidence": 0.999,
+    "is_attacker": true
+  },
+  {
+    "device_ip": "192.168.30.10",
+    "device_name": "CCTV-Camera",
+    "device_type": "CAMERA",
+    "zone": "DMZ",
+    "ensemble_score": 0.0791,
+    "iso_score": 0.1582,
+    "db_score": 0.0,
+    "tier1_decision": "PASSED",
+    "confidence": 0.0,
+    "is_attacker": false
+  },
+  {
+    "device_ip": "192.168.10.11",
+    "device_name": "PLC2",
+    "device_type": "PLC",
+    "zone": "OT",
+    "ensemble_score": 0.0773,
+    "iso_score": 0.1545,
+    "db_score": 0.0,
+    "tier1_decision": "PASSED",
+    "confidence": 0.0,
+    "is_attacker": false
+  },
+  {
+    "device_ip": "192.168.30.100",
+    "device_name": "Cloud-Gateway",
+    "device_type": "GATEWAY",
+    "zone": "DMZ",
+    "ensemble_score": 0.062,
+    "iso_score": 0.1239,
+    "db_score": 1.0,
+    "tier1_decision": "PASSED",
+    "confidence": 0.0,
+    "is_attacker": false
+  },
+  {
+    "device_ip": "192.168.20.100",
+    "device_name": "MQTT-Broker",
+    "device_type": "BROKER",
+    "zone": "IoT",
+    "ensemble_score": 0.0574,
+    "iso_score": 0.1148,
+    "db_score": 0.0,
+    "tier1_decision": "PASSED",
+    "confidence": 0.0,
+    "is_attacker": false
+  },
+  {
+    "device_ip": "192.168.10.20",
+    "device_name": "HMI",
+    "device_type": "HMI",
+    "zone": "OT",
+    "ensemble_score": 0.0547,
+    "iso_score": 0.1094,
+    "db_score": 0.0,
+    "tier1_decision": "PASSED",
+    "confidence": 0.0,
+    "is_attacker": false
+  },
+  {
+    "device_ip": "192.168.20.10",
+    "device_name": "Sensor-Temp",
+    "device_type": "SENSOR",
+    "zone": "IoT",
+    "ensemble_score": 0.0482,
+    "iso_score": 0.0965,
+    "db_score": 0.0,
+    "tier1_decision": "PASSED",
+    "confidence": 0.0,
+    "is_attacker": false
+  },
+  {
+    "device_ip": "192.168.10.10",
+    "device_name": "PLC1",
+    "device_type": "PLC",
+    "zone": "OT",
+    "ensemble_score": 0.0397,
+    "iso_score": 0.0795,
+    "db_score": 0.0,
+    "tier1_decision": "PASSED",
+    "confidence": 0.0,
+    "is_attacker": false
+  },
+  {
+    "device_ip": "192.168.20.11",
+    "device_name": "Sensor-Press",
+    "device_type": "SENSOR",
+    "zone": "IoT",
+    "ensemble_score": 0.0,
+    "iso_score": 0.0,
+    "db_score": 0.0,
+    "tier1_decision": "PASSED",
+    "confidence": 0.0,
+    "is_attacker": false
+  }
+]

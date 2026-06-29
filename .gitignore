@@ -1,0 +1,81 @@
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+*.whl
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+
+# ── Virtual environments ──────────────────────────────────────────────────────
+venv/
+.venv/
+env/
+.env/
+ENV/
+
+# ── Environment variables ─────────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+
+# ── Node / React frontend ─────────────────────────────────────────────────────
+frontend-react/node_modules/
+frontend-react/dist/
+frontend-react/.vite/
+frontend-react/coverage/
+node_modules/
+
+# ── Database (large binary — use migrations/seeds instead) ───────────────────
+dataset/*.db
+dataset/*.db-shm
+dataset/*.db-wal
+# Keep the CSV datasets and schema files
+!dataset/*.csv
+!dataset/*.sql
+!dataset/README.md
+
+# ── ML model artefacts (large) ───────────────────────────────────────────────
+*.pkl
+*.joblib
+*.h5
+*.hdf5
+*.onnx
+models/*.bin
+
+# ── Logs & captures ──────────────────────────────────────────────────────────
+*.log
+logs/
+capture/*.pcap
+capture/*.pcapng
+results/raw/
+
+# ── IDE & OS ──────────────────────────────────────────────────────────────────
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Docker volumes ───────────────────────────────────────────────────────────
+docker-volumes/
+
+# ── Temp / scratch files ──────────────────────────────────────────────────────
+*.tmp
+*.bak
+inspect_db.py
+test_incidents_api.py
+tmp_js_parse.py
+
+# ── Wazuh certificates (sensitive) ───────────────────────────────────────────
+config/wazuh_certs/*.pem
+config/wazuh_certs/*.key
+config/wazuh_indexer_ssl_certs/*-key.pem

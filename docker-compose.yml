@@ -1,0 +1,430 @@
+version: "3.8"
+
+services:
+  PLC1:
+    image: siem-agent:latest
+    container_name: PLC1
+    hostname: PLC1
+    networks:
+      ot-network:
+        ipv4_address: 192.168.10.10
+    environment:
+      - WAZUH_MANAGER=wazuh-manager
+      - WAZUH_MANAGER_PORT=1514
+      - AGENT_NAME=PLC1
+    volumes:
+      - ./wazuh_integration/ossec.conf:/var/ossec/etc/ossec.conf
+    command:
+      - sh
+      - -c
+      - |
+        /var/ossec/bin/wazuh-control start
+        python3 << 'PYEOF'
+        from pymodbus.server import StartTcpServer
+        from pymodbus.datastore import ModbusSequentialDataBlock, ModbusSlaveContext, ModbusServerContext
+        store = ModbusSlaveContext(hr=ModbusSequentialDataBlock(0, [100]*100))
+        context = ModbusServerContext(slaves=store, single=True)
+        print("PLC1: Starting Modbus TCP Server on port 502...")
+        StartTcpServer(context=context, address=("0.0.0.0", 502))
+        PYEOF
+
+  PLC2:
+    image: siem-agent:latest
+    container_name: PLC2
+    hostname: PLC2
+    networks:
+      ot-network:
+        ipv4_address: 192.168.10.11
+    environment:
+      - WAZUH_MANAGER=wazuh-manager
+      - WAZUH_MANAGER_PORT=1514
+      - AGENT_NAME=PLC2
+    volumes:
+      - ./wazuh_integration/ossec.conf:/var/ossec/etc/ossec.conf
+    command:
+      - sh
+      - -c
+      - |
+        /var/ossec/bin/wazuh-control start
+        python3 << 'PYEOF'
+        from pymodbus.server import StartTcpServer
+        from pymodbus.datastore import ModbusSequentialDataBlock, ModbusSlaveContext, ModbusServerContext
+        store = ModbusSlaveContext(hr=ModbusSequentialDataBlock(0, [200]*100))
+        context = ModbusServerContext(slaves=store, single=True)
+        print("PLC2: Starting Modbus TCP Server on port 502...")
+        StartTcpServer(context=context, address=("0.0.0.0", 502))
+        PYEOF
+
+  HMI:
+    image: siem-agent:latest
+    container_name: HMI
+    hostname: HMI
+    networks:
+      ot-network:
+        ipv4_address: 192.168.10.20
+    environment:
+      - WAZUH_MANAGER=wazuh-manager
+      - WAZUH_MANAGER_PORT=1514
+      - AGENT_NAME=HMI
+    volumes:
+      - ./wazuh_integration/ossec.conf:/var/ossec/etc/ossec.conf
+    command:
+      - sh
+      - -c
+      - |
+        /var/ossec/bin/wazuh-control start
+        sleep 20
+        python3 << 'PYEOF'
+        from pymodbus.client import ModbusTcpClient
+        import time
+        print("HMI: Starting polling loop...")
+        while True:
+            try:
+                c1 = ModbusTcpClient("192.168.10.10", port=502)
+                c2 = ModbusTcpClient("192.168.10.11", port=502)
+                if c1.connect():
+                    r = c1.read_holding_registers(0, 10)
+                    if not r.isError():
+                        print(f"PLC1 Registers: {r.registers}")
+                    c1.close()
+                if c2.connect():
+                    r = c2.read_holding_registers(0, 10)
+                    if not r.isError():
+                        print(f"PLC2 Registers: {r.registers}")
+                    c2.close()
+            except Exception as e:
+                print(f"HMI Error: {e}")
+            time.sleep(5)
+        PYEOF
+
+  MQTT-Broker:
+    image: eclipse-mosquitto:latest
+    container_name: MQTT-Broker
+    hostname: MQTT-Broker
+    networks:
+      iot-network:
+        ipv4_address: 192.168.20.100
+    environment:
+      - WAZUH_MANAGER=wazuh-manager
+      - WAZUH_MANAGER_PORT=1514
+      - AGENT_NAME=MQTT-Broker
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - ./wazuh_integration/ossec.conf:/var/ossec/etc/ossec.conf
+
+  Sensor-Temp:
+    image: siem-agent:latest
+    container_name: Sensor-Temp
+    hostname: Sensor-Temp
+    networks:
+      iot-network:
+        ipv4_address: 192.168.20.10
+    environment:
+      - WAZUH_MANAGER=wazuh-manager
+      - WAZUH_MANAGER_PORT=1514
+      - AGENT_NAME=Sensor-Temp
+    volumes:
+      - ./wazuh_integration/ossec.conf:/var/ossec/etc/ossec.conf
+    command:
+      - sh
+      - -c
+      - |
+        /var/ossec/bin/wazuh-control start
+        sleep 15
+        python3 << 'PYEOF'
+        import paho.mqtt.client as mqtt
+        import random, time
+        client = mqtt.Client()
+        client.connect("192.168.20.100", 1883, 60)
+        print("Sensor-Temp: Publishing temperature readings...")
+        while True:
+            temp = round(random.uniform(20, 35), 2)
+            client.publish("sensors/temperature", str(temp))
+            print(f"Published temperature: {temp}")
+            time.sleep(3)
+        PYEOF
+
+  Sensor-Pressure:
+    image: siem-agent:latest
+    container_name: Sensor-Pressure
+    hostname: Sensor-Pressure
+    networks:
+      iot-network:
+        ipv4_address: 192.168.20.11
+    environment:
+      - WAZUH_MANAGER=wazuh-manager
+      - WAZUH_MANAGER_PORT=1514
+      - AGENT_NAME=Sensor-Pressure
+    volumes:
+      - ./wazuh_integration/ossec.conf:/var/ossec/etc/ossec.conf
+    command:
+      - sh
+      - -c
+      - |
+        /var/ossec/bin/wazuh-control start
+        sleep 15
+        python3 << 'PYEOF'
+        import paho.mqtt.client as mqtt
+        import random, time
+        client = mqtt.Client()
+        client.connect("192.168.20.100", 1883, 60)
+        print("Sensor-Pressure: Publishing pressure readings...")
+        while True:
+            pressure = round(random.uniform(1, 5), 2)
+            client.publish("sensors/pressure", str(pressure))
+            print(f"Published pressure: {pressure}")
+            time.sleep(3)
+        PYEOF
+
+  CCTV-Camera:
+    image: siem-agent:latest
+    container_name: CCTV-Camera
+    hostname: CCTV-Camera
+    networks:
+      dmz-network:
+        ipv4_address: 192.168.30.10
+    environment:
+      - WAZUH_MANAGER=wazuh-manager
+      - WAZUH_MANAGER_PORT=1514
+      - AGENT_NAME=CCTV-Camera
+    volumes:
+      - ./wazuh_integration/ossec.conf:/var/ossec/etc/ossec.conf
+    command:
+      - sh
+      - -c
+      - |
+        /var/ossec/bin/wazuh-control start
+        python3 << 'PYEOF'
+        from flask import Flask
+        app = Flask(__name__)
+        @app.route("/")
+        def feed():
+            return "CCTV Camera Feed"
+        print("CCTV-Camera: Starting HTTP server on port 80...")
+        app.run(host="0.0.0.0", port=80)
+        PYEOF
+
+  Cloud-Gateway:
+    image: siem-agent:latest
+    container_name: Cloud-Gateway
+    hostname: Cloud-Gateway
+    networks:
+      dmz-network:
+        ipv4_address: 192.168.30.100
+      iot-network:
+        ipv4_address: 192.168.20.200
+    environment:
+      - WAZUH_MANAGER=wazuh-manager
+      - WAZUH_MANAGER_PORT=1514
+      - AGENT_NAME=Cloud-Gateway
+    volumes:
+      - ./wazuh_integration/ossec.conf:/var/ossec/etc/ossec.conf
+    command:
+      - sh
+      - -c
+      - |
+        /var/ossec/bin/wazuh-control start
+        sleep 20
+        python3 << 'PYEOF'
+        import paho.mqtt.client as mqtt
+        def on_message(client, userdata, msg):
+            print(f"Cloud-Gateway received: {msg.topic} -> {msg.payload.decode()}")
+        client = mqtt.Client()
+        client.on_message = on_message
+        client.connect("192.168.20.100", 1883, 60)
+        client.subscribe("#")
+        print("Cloud-Gateway: Subscribed to all MQTT topics...")
+        client.loop_forever()
+        PYEOF
+
+  Engineering-WS:
+    image: siem-agent:latest
+    container_name: Engineering-WS
+    hostname: Engineering-WS
+    restart: "no"
+    networks:
+      ot-network:
+        ipv4_address: 192.168.10.50
+      dmz-network:
+        ipv4_address: 192.168.30.50
+    environment:
+      - WAZUH_MANAGER=wazuh-manager
+      - WAZUH_MANAGER_PORT=1514
+      - AGENT_NAME=Engineering-WS
+    volumes:
+      - ./wazuh_integration/ossec.conf:/var/ossec/etc/ossec.conf
+    command:
+      - sh
+      - -c
+      - |
+        /var/ossec/bin/wazuh-control start
+        sleep 40
+        python3 << 'PYEOF'
+        from pymodbus.client import ModbusTcpClient
+        import socket
+        print("Engineering-WS: Scanning 192.168.10.1-25 on port 502...")
+        targets = []
+        for i in range(1, 26):
+            ip = f"192.168.10.{i}"
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(1)
+            if sock.connect_ex((ip, 502)) == 0:
+                print(f"  [FOUND] {ip}:502 is open")
+                targets.append(ip)
+            sock.close()
+        for ip in targets:
+            try:
+                client = ModbusTcpClient(ip, port=502)
+                if client.connect():
+                    rr = client.read_holding_registers(0, 10)
+                    if not rr.isError():
+                        print(f"  [READ] {ip} registers: {rr.registers}")
+                    client.write_register(0, 9999)
+                    print(f"  [WRITE] {ip} register 0 set to 9999")
+                    rr = client.read_holding_registers(0, 10)
+                    if not rr.isError():
+                        print(f"  [VERIFY] {ip} registers: {rr.registers}")
+                    client.close()
+            except Exception as e:
+                print(f"  [ERROR] {ip}: {e}")
+        print("Engineering-WS: Operations complete.")
+        import time
+        while True:
+            time.sleep(3600)
+        PYEOF
+
+
+  wazuh-indexer:
+    image: wazuh/wazuh-indexer:4.7.5
+    container_name: wazuh-indexer
+    environment:
+      - OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - ./config/wazuh_indexer_ssl_certs/root-ca.pem:/usr/share/wazuh-indexer/certs/root-ca.pem
+      - ./config/wazuh_indexer_ssl_certs/wazuh.indexer-key.pem:/usr/share/wazuh-indexer/certs/wazuh.indexer.key
+      - ./config/wazuh_indexer_ssl_certs/wazuh.indexer.pem:/usr/share/wazuh-indexer/certs/wazuh.indexer.pem
+      - ./config/wazuh_indexer_ssl_certs/admin.pem:/usr/share/wazuh-indexer/certs/admin.pem
+      - ./config/wazuh_indexer_ssl_certs/admin-key.pem:/usr/share/wazuh-indexer/certs/admin-key.pem
+      - ./config/wazuh_indexer/wazuh.indexer.yml:/usr/share/wazuh-indexer/opensearch.yml
+      - ./config/wazuh_indexer/internal_users.yml:/usr/share/wazuh-indexer/opensearch-security/internal_users.yml
+      - wazuh-indexer-data:/var/lib/wazuh-indexer
+    networks:
+      ot-network:
+        aliases:
+          - wazuh.indexer
+
+  wazuh-manager:
+    image: wazuh/wazuh-manager:4.7.5
+    container_name: wazuh-manager
+    depends_on:
+      - wazuh-indexer
+    ports:
+      - "1514:1514"
+      - "1515:1515"
+      - "55000:55000"
+    environment:
+      - INDEXER_URL=https://wazuh.indexer:9200
+      - INDEXER_USERNAME=admin
+      - INDEXER_PASSWORD=SecretPassword
+      - FILEBEAT_SSL_VERIFICATION_MODE=full
+      - SSL_CERTIFICATE_AUTHORITIES=/etc/ssl/root-ca.pem
+      - SSL_CERTIFICATE=/etc/ssl/filebeat.pem
+      - SSL_KEY=/etc/ssl/filebeat.key
+      - API_USERNAME=wazuh-wui
+      - API_PASSWORD=MyS3cr37P450r.*-
+    volumes:
+      - wazuh_api_configuration:/var/ossec/api/configuration
+      - wazuh_etc:/var/ossec/etc
+      - wazuh_logs:/var/ossec/logs
+      - wazuh_queue:/var/ossec/queue
+      - wazuh_var_multigroups:/var/ossec/var/multigroups
+      - wazuh_integrations:/var/ossec/integrations
+      - wazuh_active_response:/var/ossec/active-response/bin
+      - wazuh_agentless:/var/ossec/agentless
+      - wazuh_wodles:/var/ossec/wodles
+      - filebeat_etc:/etc/filebeat
+      - filebeat_var:/var/lib/filebeat
+      - ./config/wazuh_indexer_ssl_certs/root-ca.pem:/etc/ssl/root-ca.pem
+      - ./config/wazuh_indexer_ssl_certs/wazuh.manager.pem:/etc/ssl/filebeat.pem
+      - ./config/wazuh_indexer_ssl_certs/wazuh.manager-key.pem:/etc/ssl/filebeat.key
+      - ./config/wazuh_cluster/wazuh_manager.conf:/wazuh-config-mount/etc/ossec.conf
+    networks:
+      ot-network:
+        ipv4_address: 192.168.10.90
+        aliases:
+          - wazuh.manager
+      iot-network:
+        ipv4_address: 192.168.20.90
+        aliases:
+          - wazuh.manager
+      dmz-network:
+        ipv4_address: 192.168.30.90
+
+  wazuh-dashboard:
+    image: wazuh/wazuh-dashboard:4.7.5
+    container_name: wazuh-dashboard
+    depends_on:
+      - wazuh-manager
+    ports:
+      - "443:5601"
+    environment:
+      - INDEXER_USERNAME=admin
+      - INDEXER_PASSWORD=SecretPassword
+      - WAZUH_API_URL=https://wazuh.manager
+      - DASHBOARD_USERNAME=kibanaserver
+      - DASHBOARD_PASSWORD=kibanaserver
+      - API_USERNAME=wazuh-wui
+      - API_PASSWORD=MyS3cr37P450r.*-
+    volumes:
+      - ./config/wazuh_indexer_ssl_certs/wazuh.dashboard.pem:/usr/share/wazuh-dashboard/certs/wazuh-dashboard.pem
+      - ./config/wazuh_indexer_ssl_certs/wazuh.dashboard-key.pem:/usr/share/wazuh-dashboard/certs/wazuh-dashboard-key.pem
+      - ./config/wazuh_indexer_ssl_certs/root-ca.pem:/usr/share/wazuh-dashboard/certs/root-ca.pem
+      - ./config/wazuh_dashboard/opensearch_dashboards.yml:/usr/share/wazuh-dashboard/config/opensearch_dashboards.yml
+      - ./config/wazuh_dashboard/wazuh.yml:/usr/share/wazuh-dashboard/data/wazuh/config/wazuh.yml
+      - wazuh-dashboard-config:/usr/share/wazuh-dashboard/data/wazuh/config
+      - wazuh-dashboard-custom:/usr/share/wazuh-dashboard/plugins/wazuh/public/assets/custom
+    networks:
+      ot-network:
+        aliases:
+          - wazuh.dashboard
+
+networks:
+  ot-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.10.0/24
+  iot-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.20.0/24
+  dmz-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.30.0/24
+
+volumes:
+  wazuh_api_configuration:
+  wazuh_etc:
+  wazuh_logs:
+  wazuh_queue:
+  wazuh_var_multigroups:
+  wazuh_integrations:
+  wazuh_active_response:
+  wazuh_agentless:
+  wazuh_wodles:
+  filebeat_etc:
+  filebeat_var:
+  wazuh-indexer-data:
+  wazuh-dashboard-config:
+  wazuh-dashboard-custom:
+
