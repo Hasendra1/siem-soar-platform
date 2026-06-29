@@ -159,6 +159,8 @@ The system architecture comprises two logical tiers. The first tier is the simul
 
 [INSERT ARCHITECTURE DIAGRAM HERE — The diagram should depict: (1) Three Docker bridge networks (OT, IoT, DMZ) with their constituent devices and IP addresses as listed in Table 2; (2) The traffic capture module (Scapy) feeding into the feature extraction pipeline; (3) The two-tier ML pipeline (Isolation Forest → DBSCAN); (4) The SmartIsolator decision engine receiving ensemble scores and issuing Docker network disconnect commands; (5) The Flask API + WebSocket layer pushing real-time events to the React dashboard; (6) The Wazuh manager connected to all device containers via agents.]
 
+The overall system architecture of the SIEM+SOAR platform is illustrated in Figure 1. This system structure maps the flow of events from the virtualized device agents across the three network zones (OT, IoT, and DMZ) into the Scapy capture utility, through the feature extraction pipeline, and into the two-tier machine learning ensemble (comprising Isolation Forest and DBSCAN). The resulting scores are passed to the SmartIsolator, which coordinates micro-segmentation enforcements, while the Flask API and WebSocket server push real-time alerts to the SOC dashboard.
+
 ### 5.2 Testbed Design
 
 Table 2 details the nine simulated devices, their network assignments, IP addresses, and operational protocols.
@@ -229,7 +231,11 @@ The attacker device (Engineering-WS, 192.168.10.50) is deliberately connected to
 
 [SCREENSHOT PLACEHOLDER #2: docker ps showing all containers running]
 
+As shown in Figure 2, the status of the virtual environment is verified using Docker CLI commands, confirming that all twelve platform containers—including the three Wazuh cluster components and nine device agents—are active and running.
+
 [SCREENSHOT PLACEHOLDER #3: docker network list showing active networks]
+
+Figure 3 illustrates the configuration of the network bridges. The three isolated networks (`siem-soar-platform_ot-network` for Modbus devices, `siem-soar-platform_iot-network` for MQTT telemetry, and `siem-soar-platform_dmz-network` for public-facing gateway services) ensure that traffic is segregated by default according to functional zones.
 
 ### 6.2 Traffic Generation and Capture Pipeline
 
@@ -241,7 +247,11 @@ A synthetic dataset generator (`ml_pipeline/generate_synthetic_dataset.py`) was 
 
 [SCREENSHOT PLACEHOLDER #4: Real-time traffic capture console output]
 
+The console output of the traffic capture script is shown in Figure 4. The sniffer tracks network packets and groups them into 10-second sliding windows, displaying telemetry metrics such as packet rate, scan rate, and write ratio per device to verify active traffic aggregation.
+
 [SCREENSHOT PLACEHOLDER #5: SQLite database configuration showing clustering_dataset.csv]
+
+Figure 5 shows the format of the generated behavioral dataset (`clustering_dataset.csv`), showcasing the columns and aggregated feature statistics for each device profile across the 30-window sliding session.
 
 ### 6.3 Machine Learning Pipeline
 
@@ -249,7 +259,11 @@ The training pipeline is implemented in `ml_pipeline/train_models.py`. It loads 
 
 [SCREENSHOT PLACEHOLDER #6: ML model training console logs]
 
+Figure 6 displays the terminal logs from running the model training pipeline. The logs verify the fitment of the Isolation Forest and DBSCAN algorithms, including the optimization process and the automatic epsilon distance threshold calculation.
+
 [SCREENSHOT PLACEHOLDER #13: Device scores graph showing classification separation]
+
+To assess model accuracy, the per-device anomaly scores are graphed. As shown in Figure 13, the two-tier ensemble achieves a clear and complete classification gap, separating the attacker node (score of 1.0) from all benign device nodes (maximum benign score of 0.079).
 
 ### 6.4 Detection and Enforcement Layer
 
@@ -263,15 +277,23 @@ The ML-Based Segmentation Engine (`enforcement/ml_based_segmentation.py`) handle
 
 [SCREENSHOT PLACEHOLDER #7: SmartIsolator unit test results verifying target isolation and scan exception logic]
 
+The security policy enforcement is validated through dedicated test suites. As shown in the unit test logs in Figure 7, the isolation logic successfully quarantined the attacker IP and the compromised write target while correctly bypassing devices that were only scanned, verifying the precision of the SOAR state machine.
+
 ### 6.5 Dashboard and Visualisation Layer
 
 The frontend is implemented as a React single-page application built with Vite and styled with Tailwind CSS, located in `frontend-react/`. It comprises seven pages: **Dashboard** (real-time event feed, threat level gauge, network topology visualisation, and summary statistics), **Isolated Devices** (list of all devices isolated by the segmentation engine with timestamps, reasons, and network details), **Rules Triggered** (detection rules that fired, grouped by action type with trigger counts), **Anomalies Detected** (detailed anomaly list with ensemble scores, severity classification, and detection method), **Incidents** (CRITICAL incident records with related anomaly and event counts), **Threat Hunting** (investigation interface for querying events by IP, time range, and action type), and **Settings** (system configuration, ML monitor control, and database reset).
 
 [SCREENSHOT PLACEHOLDER #8: React Dashboard Overview showing the live threat stats]
 
+Figure 8 presents the main React-based SOC dashboard. This interface provides an overall security overview, containing key metrics such as active alerts, the system threat level gauge, current isolations, and a live topological graph of the network zones.
+
 [SCREENSHOT PLACEHOLDER #9: Isolated Devices page tracking active container isolations]
 
+The isolated devices interface displays the physical containment status of compromised devices. As illustrated in Figure 9, the table registers each quarantined container, detailing its IP address, host network zone, isolation reason (e.g., threat source or compromised target), and timestamp.
+
 [SCREENSHOT PLACEHOLDER #10: Anomalies Detected Log recording pipeline alerts]
+
+Anomalous events identified by the two-tier machine learning ensemble are logged separately for audit. Figure 10 shows the anomaly detection feed, showing individual device anomalous scores, detection confidence, and the specific classification assigned by the ensemble models.
 
 The backend API is a Flask application (`api/app.py`) with four route blueprints: `dashboard` (summary statistics, timeline, topology, isolations, rules, anomalies, and cluster data), `data` (raw event retrieval and filtering), `investigation` (threat hunting queries and investigation management), and `system` (ML monitor start/stop, system reset, and status reporting). Cross-origin requests are enabled via Flask-CORS, and real-time updates are delivered through Flask-SocketIO.
 
@@ -437,6 +459,8 @@ Below is the directory tree showing the organization of the project files:
 
 [SCREENSHOT PLACEHOLDER #11: full file tree of C:\siem-soar-platform\ and C:\iot-ot-demo\ from the editor]
 
+Figure 11 outlines the full workspace layout of the repository. This structure highlights the division of labor between backend API files, frontend React components, machine learning pipelines, and network enforcement scripts.
+
 ### Appendix B: SQLite Database Schema
 The database `siem_database.db` contains four tables:
 *   `events`: Logs raw packet features extracted by Scapy.
@@ -445,6 +469,8 @@ The database `siem_database.db` contains four tables:
 *   `isolations`: Tracks containment actions, including container name and timestamp.
 
 [SCREENSHOT PLACEHOLDER #12: sample rows from siem_database.db events and isolations tables, opened in DB Browser for SQLite]
+
+Figure 12 shows the raw database tables accessed via a graphical SQLite viewer. This view provides verification of the persistent records in the `events`, `anomalies`, `incidents`, and `isolations` tables during live operation.
 
 ### Appendix C: Project Diary Extracts
 The following extracts document key meetings and decisions:
